@@ -3,8 +3,8 @@ import { Ear, FileDown, NotebookPen } from 'lucide-react'
 const steps = [
   {
     icon: Ear,
-    title: 'Listen',
-    body: 'Notable listens as your computer reads a chapter from a textbook aloud.',
+    title: 'Listen or type',
+    body: 'Notable listens as your computer reads a chapter from a textbook aloud. You can also type out or copy and paste text as manual input.',
   },
   {
     icon: NotebookPen,

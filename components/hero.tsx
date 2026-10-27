@@ -1,4 +1,4 @@
-import { ArrowUpRight, FileText, Volume2 } from 'lucide-react'
+import { ArrowUpRight, ClipboardPaste, FileText, Keyboard, Volume2 } from 'lucide-react'
 import { LINKEDIN_URL } from './site-header'
 
 export function Hero() {
@@ -11,7 +11,8 @@ export function Hero() {
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-muted-foreground text-pretty">
           Notable listens as your computer reads a chapter from a textbook aloud, captures the key thoughts,
-          definitions, and concepts, and translates them into study notes you can export to a Word document.
+          definitions, and concepts, and translates them into study notes you can export to a Word document. You can also add manual input by typing it out or copying and pasting
+          it in.
         </p>
         <div className="mt-8 flex flex-wrap items-center gap-4">
           <a
@@ -43,7 +44,27 @@ export function Hero() {
               <span key={i} className="flex-1 rounded-sm bg-primary/70" style={{ height: `${h}%` }} />
             ))}
           </div>
-          <ul className="mt-8 flex flex-col gap-4">
+          <div className="mt-6">
+            <div className="flex items-center justify-between">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+                <Keyboard className="size-3.5" />
+                Manual input
+              </p>
+              <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                <ClipboardPaste className="size-3.5" />
+                Type or paste
+              </span>
+            </div>
+            <div className="mt-2 rounded-lg border border-dashed border-primary/40 bg-background p-3">
+              <div className="h-2 w-10/12 rounded bg-border" />
+              <div className="mt-1.5 h-2 w-3/4 rounded bg-border" />
+              <div className="mt-1.5 flex items-center gap-0.5">
+                <div className="h-2 w-1/3 rounded bg-border" />
+                <span className="h-3.5 w-px animate-pulse bg-primary" />
+              </div>
+            </div>
+          </div>
+          <ul className="mt-6 flex flex-col gap-4">
             {['Key thoughts', 'Definitions', 'Concepts'].map((label) => (
               <li key={label} className="rounded-lg bg-muted p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-primary">{label}</p>
