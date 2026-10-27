@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { FileText, Keyboard, Loader2, Mic, Sparkles, Square, Trash2 } from 'lucide-react'
 import type { StudyNotes } from '@/lib/notes'
 import { exportNotesToWord } from '@/lib/export-docx'
+import { extractNotesLocally } from '@/lib/local-notes'
 
 type RecognitionResultList = ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>
 
@@ -112,11 +113,10 @@ export function NotableWidget() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
       })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error ?? 'Could not generate notes.')
-      setNotes(data as StudyNotes)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not generate notes.')
+      if (!res.ok) throw new Error('AI unavailable')
+      setNotes((await res.json()) as StudyNotes)
+    } catch {
+      setNotes(extractNotesLocally(text))
     } finally {
       setIsGenerating(false)
     }
