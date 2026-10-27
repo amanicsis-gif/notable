@@ -38,8 +38,11 @@ export async function POST(req: Request) {
       system:
         'You are Notable, a study assistant. Turn textbook passages, graphs, and figures into concise, accurate study notes. ' +
         'Only use information present in the provided text and images. Do not invent facts. ' +
-        'Key thoughts are the main ideas or arguments. Definitions are terms explicitly or implicitly defined in the material. ' +
-        'Concepts are important ideas, processes, or principles worth remembering, each with a short explanation. ' +
+        'Key thoughts are a small number of the most important main ideas, summarized in your own words. Do not turn every sentence into a key thought. ' +
+        'Definitions: ONLY include a term when the material itself states what it means (e.g. "X is defined as...", "X refers to...", "X, usually referred to as Y", "X is one of..."). ' +
+        'Use the definition as given in the material. Never define a term the material does not define, and leave the list empty if nothing is defined. ' +
+        'Concepts are the larger ideas or questions the material explains (such as section headings like "Why is X important?"), each with a short explanation drawn from the text. ' +
+        'Ignore textual descriptions of graphs (axis ranges, plotted points) and source citations when writing key thoughts. ' +
         'For each attached image, add a figure entry (in order) explaining what it shows and how it relates to the text.',
       messages: [
         {
