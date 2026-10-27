@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { FileText, Keyboard, Loader2, Mic, Sparkles, Square, Trash2 } from 'lucide-react'
+import type { ClipboardEvent, DragEvent } from 'react'
+import { FileText, ImagePlus, Keyboard, Loader2, Mic, Sparkles, Square, Trash2, X } from 'lucide-react'
 import type { StudyNotes } from '@/lib/notes'
 import { exportNotesToWord } from '@/lib/export-docx'
 import { extractNotesLocally } from '@/lib/local-notes'
+import { getImageFiles, MAX_IMAGES, prepareImage, type AttachedImage } from '@/lib/images'
 
 type RecognitionResultList = ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>
 
@@ -37,7 +39,10 @@ export function NotableWidget() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [images, setImages] = useState<AttachedImage[]>([])
+  const [isDragging, setIsDragging] = useState(false)
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const shouldListenRef = useRef(false)
 
@@ -98,9 +103,45 @@ export function NotableWidget() {
     recognitionRef.current?.stop()
   }
 
+  async function addImages(files: File[]) {
+    if (files.length === 0) return
+    const room = MAX_IMAGES - images.length
+    if (room <= 0) {
+      setError(`You can attach up to ${MAX_IMAGES} images.`)
+      return
+    }
+    setError(files.length > room ? `Only the first ${room} image(s) were added (limit ${MAX_IMAGES}).` : null)
+    try {
+      const prepared = await Promise.all(files.slice(0, room).map(prepareImage))
+      setImages((prev) => [...prev, ...prepared].slice(0, MAX_IMAGES))
+    } catch {
+      setError('One of those images could not be read. Try a PNG or JPG.')
+    }
+  }
+
+  function handlePaste(e: ClipboardEvent<HTMLTextAreaElement>) {
+    const files = getImageFiles(e.clipboardData.items)
+    if (files.length === 0) return
+    // Keep any pasted text; only block the default when the clipboard is image-only.
+    if (!e.clipboardData.getData('text/plain')) e.preventDefault()
+    void addImages(files)
+  }
+
+  function handleDrop(e: DragEvent<HTMLDivElement>) {
+    setIsDragging(false)
+    const files = getImageFiles(e.dataTransfer.files)
+    if (files.length === 0) return
+    e.preventDefault()
+    void addImages(files)
+  }
+
+  function removeImage(id: string) {
+    setImages((prev) => prev.filter((img) => img.id !== id))
+  }
+
   async function generateNotes() {
     const text = [transcript, manualText].map((t) => t.trim()).filter(Boolean).join('\n\n')
-    if (!text) {
+    if (!text && images.length === 0) {
       setError('Listen to a chapter or add manual input first.')
       return
     }
@@ -111,7 +152,7 @@ export function NotableWidget() {
       const res = await fetch('/api/notes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, images: images.map((img) => img.dataUrl) }),
       })
       if (!res.ok) throw new Error('AI unavailable')
       setNotes((await res.json()) as StudyNotes)
@@ -126,7 +167,7 @@ export function NotableWidget() {
     if (!notes) return
     setIsExporting(true)
     try {
-      await exportNotesToWord(notes)
+      await exportNotesToWord(notes, images)
     } catch {
       setError('Could not export the Word document.')
     } finally {
@@ -139,11 +180,12 @@ export function NotableWidget() {
     setTranscript('')
     setInterim('')
     setManualText('')
+    setImages([])
     setNotes(null)
     setError(null)
   }
 
-  const hasInput = Boolean(transcript.trim() || manualText.trim())
+  const hasInput = Boolean(transcript.trim() || manualText.trim() || images.length > 0)
 
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
@@ -199,19 +241,84 @@ export function NotableWidget() {
       </div>
 
       <div className="mt-5">
-        <label htmlFor="manual-input" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
-          <Keyboard className="size-3.5" aria-hidden="true" />
-          Manual input
-        </label>
-        <textarea
-          id="manual-input"
-          value={manualText}
-          onChange={(e) => setManualText(e.target.value)}
-          placeholder="Type or paste text from your textbook..."
-          rows={4}
-          maxLength={40000}
-          className="mt-2 w-full resize-y rounded-lg border border-dashed border-primary/40 bg-background p-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-2 focus-visible:ring-primary/20"
-        />
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="manual-input" className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-primary">
+            <Keyboard className="size-3.5" aria-hidden="true" />
+            Manual input
+          </label>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={images.length >= MAX_IMAGES}
+            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary transition-colors hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ImagePlus className="size-3.5" aria-hidden="true" />
+            Add image
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            className="sr-only"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={(e) => {
+              void addImages(getImageFiles(e.target.files))
+              e.target.value = ''
+            }}
+          />
+        </div>
+        <div
+          onDragOver={(e) => {
+            if (Array.from(e.dataTransfer.types).includes('Files')) {
+              e.preventDefault()
+              setIsDragging(true)
+            }
+          }}
+          onDragLeave={() => setIsDragging(false)}
+          onDrop={handleDrop}
+          className={`mt-2 rounded-lg border border-dashed bg-background transition-colors focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 ${
+            isDragging ? 'border-primary bg-primary/5' : 'border-primary/40'
+          }`}
+        >
+          <textarea
+            id="manual-input"
+            value={manualText}
+            onChange={(e) => setManualText(e.target.value)}
+            onPaste={handlePaste}
+            placeholder="Type or paste text, graphs, or figures from your textbook..."
+            rows={4}
+            maxLength={40000}
+            aria-describedby="manual-input-hint"
+            className="block w-full resize-y rounded-lg bg-transparent p-3 text-sm leading-relaxed outline-none placeholder:text-muted-foreground"
+          />
+          {images.length > 0 ? (
+            <ul className="flex flex-wrap gap-2 border-t border-dashed border-primary/30 p-3" aria-label="Attached images">
+              {images.map((img, i) => (
+                <li key={img.id} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
+                  <img
+                    src={img.dataUrl}
+                    alt={`Attached image ${i + 1}`}
+                    className="size-20 rounded-md border border-border object-cover"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeImage(img.id)}
+                    className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-foreground text-background shadow-sm hover:opacity-90"
+                  >
+                    <X className="size-3" aria-hidden="true" />
+                    <span className="sr-only">Remove image {i + 1}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+        <p id="manual-input-hint" className="mt-1.5 text-xs text-muted-foreground">
+          Paste, drop, or add up to {MAX_IMAGES} images like graphs and diagrams.
+        </p>
       </div>
 
       <div className="mt-3 flex gap-2">
@@ -246,6 +353,30 @@ export function NotableWidget() {
           <NoteGroup label="Key thoughts" items={notes.keyThoughts.map((t) => ({ text: t }))} />
           <NoteGroup label="Definitions" items={notes.definitions.map((d) => ({ term: d.term, text: d.definition }))} />
           <NoteGroup label="Concepts" items={notes.concepts.map((c) => ({ term: c.name, text: c.explanation }))} />
+          {images.length > 0 ? (
+            <div className="rounded-lg bg-muted p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-primary">Figures</p>
+              <ul className="mt-2 flex flex-col gap-3">
+                {images.map((img, i) => {
+                  const figure = notes.figures?.[i]
+                  return (
+                    <li key={img.id} className="flex gap-3">
+                      {/* eslint-disable-next-line @next/next/no-img-element -- local data URL preview */}
+                      <img
+                        src={img.dataUrl}
+                        alt={figure?.title ?? `Figure ${i + 1}`}
+                        className="size-16 shrink-0 rounded-md border border-border bg-background object-contain"
+                      />
+                      <p className="text-sm leading-relaxed">
+                        <span className="font-semibold">{figure?.title ? `Figure ${i + 1}: ${figure.title}` : `Figure ${i + 1}`}</span>
+                        {figure?.explanation ? <span className="block text-muted-foreground">{figure.explanation}</span> : null}
+                      </p>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          ) : null}
           <button
             type="button"
             onClick={handleExport}

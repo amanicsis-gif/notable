@@ -99,5 +99,6 @@ export function extractNotesLocally(text: string): StudyNotes {
     keyThoughts,
     definitions,
     concepts,
+    figures: [],
   }
 }

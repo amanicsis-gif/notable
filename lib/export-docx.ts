@@ -1,7 +1,10 @@
 import type { StudyNotes } from './notes'
+import type { AttachedImage } from './images'
 
-export async function exportNotesToWord(notes: StudyNotes) {
-  const { Document, HeadingLevel, Packer, Paragraph, TextRun } = await import('docx')
+const MAX_IMAGE_WIDTH = 560
+
+export async function exportNotesToWord(notes: StudyNotes, images: AttachedImage[] = []) {
+  const { Document, HeadingLevel, ImageRun, Packer, Paragraph, TextRun } = await import('docx')
 
   const heading = (text: string) => new Paragraph({ text, heading: HeadingLevel.HEADING_2, spacing: { before: 240 } })
   const bullet = (children: InstanceType<typeof TextRun>[]) => new Paragraph({ children, bullet: { level: 0 } })
@@ -25,6 +28,33 @@ export async function exportNotesToWord(notes: StudyNotes) {
     notes.concepts.forEach(({ name, explanation }) =>
       children.push(bullet([new TextRun({ text: `${name}: `, bold: true }), new TextRun(explanation)])),
     )
+  }
+
+  if (images.length > 0) {
+    children.push(heading('Figures'))
+    images.forEach((image, i) => {
+      const figure = notes.figures[i]
+      const scale = Math.min(1, MAX_IMAGE_WIDTH / image.width)
+      children.push(
+        new Paragraph({
+          spacing: { before: 160 },
+          children: [
+            new ImageRun({
+              type: 'jpg',
+              data: image.dataUrl,
+              transformation: { width: Math.round(image.width * scale), height: Math.round(image.height * scale) },
+              altText: { name: figure?.title ?? `Figure ${i + 1}`, description: figure?.explanation ?? '', title: figure?.title ?? '' },
+            }),
+          ],
+        }),
+      )
+      children.push(
+        new Paragraph({
+          children: [new TextRun({ text: figure?.title ? `Figure ${i + 1}: ${figure.title}` : `Figure ${i + 1}`, bold: true })],
+        }),
+      )
+      if (figure?.explanation) children.push(new Paragraph({ children: [new TextRun(figure.explanation)] }))
+    })
   }
 
   const doc = new Document({ creator: 'Notable', title: notes.title, sections: [{ children }] })
