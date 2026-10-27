@@ -7,7 +7,7 @@ export function Hero() {
       <div>
         <p className="text-sm font-medium uppercase tracking-widest text-primary">Desktop widget</p>
         <h1 className="mt-4 font-serif text-4xl font-semibold leading-tight text-balance md:text-5xl">
-          Turn a textbook chapter read aloud into study notes.
+          A Notable study budy for all your note-taking needs.
         </h1>
         <p className="mt-6 text-lg leading-relaxed text-muted-foreground text-pretty">
           Notable listens as your computer reads a chapter from a textbook aloud, captures the key thoughts,
